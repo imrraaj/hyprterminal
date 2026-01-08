@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,61 +92,180 @@ const mockStrategies: ActiveStrategy[] = [
 
 const strategyManager = TradingStrategyManager.getInstance();
 
+// Memoized strategy card component
+const StrategyCard = memo(({
+    strategy,
+    onStop
+}: {
+    strategy: any;
+    onStop: (id: string) => void;
+}) => (
+    <Card>
+        <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                        <CardTitle className="text-lg">{strategy.Strategy?.name || strategy.ID}</CardTitle>
+                        <Badge variant={strategy.IsRunning ? 'default' : 'secondary'}>
+                            {strategy.IsRunning ? 'running' : 'stopped'}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                            {strategy.Symbol}/USD · {strategy.Interval}
+                        </span>
+                    </div>
+                    {strategy.Config?.Parameters && (
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            {Object.entries(strategy.Config.Parameters).map(([key, value]) => (
+                                <span key={key}>
+                                    <span className="capitalize">{key}:</span>{' '}
+                                    <span className="font-medium text-foreground">
+                                        {typeof value === 'number' ? (value as number).toFixed(2) : String(value)}
+                                    </span>
+                                </span>
+                            ))}
+                            <span>
+                                TP: <span className="font-medium text-green-400">{strategy.Config.TakeProfitPercent}%</span>
+                            </span>
+                            <span>
+                                SL: <span className="font-medium text-red-400">{strategy.Config.StopLossPercent}%</span>
+                            </span>
+                            <span>
+                                Dir: <span className="font-medium text-foreground capitalize">{strategy.Config.TradeDirection || 'both'}</span>
+                            </span>
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    {strategy.IsRunning && !strategy.Position?.IsOpen && (
+                        <Button variant="destructive" size="sm" onClick={() => onStop(strategy.ID)}>
+                            Stop
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </CardHeader>
+        <CardContent>
+            {strategy.Position?.IsOpen ? (
+                <div className="space-y-3">
+                    <div className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Badge variant={strategy.Position.Side === 'long' ? 'default' : 'destructive'} className="text-xs">
+                                    {strategy.Position.Side.toUpperCase()}
+                                </Badge>
+                                <span className="font-semibold">{strategy.Symbol}/USD</span>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onStop(strategy.ID)}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">Entry Price</p>
+                                <p className="font-medium">${strategy.Position.EntryPrice?.toFixed(2) || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Size</p>
+                                <p className="font-medium">{strategy.Position.Size} {strategy.Symbol}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">TP Target</p>
+                                <p className="font-medium text-green-400">${(strategy.Position.EntryPrice * (1 + strategy.Config.TakeProfitPercent / 100)).toFixed(2)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">SL Target</p>
+                                <p className="font-medium text-red-400">${(strategy.Position.EntryPrice * (1 - strategy.Config.StopLossPercent / 100)).toFixed(2)}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No active positions</p>
+            )}
+        </CardContent>
+    </Card>
+));
+StrategyCard.displayName = "StrategyCard";
+
 export function ActiveStrategiesTab() {
     const [strategies, setStrategies] = useState<any[]>([]);
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [sortBy, setSortBy] = useState<string>('pnl');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Fetch running strategies
-    useEffect(() => {
-        const fetchStrategies = async () => {
-            try {
-                setIsLoading(true);
-                const running = await strategyManager.getRunningStrategies();
-                setStrategies(running || []);
-            } catch (error) {
-                console.error('Failed to fetch strategies:', error);
-            } finally {
-                setIsLoading(false);
+    // Track previous data to avoid unnecessary re-renders
+    const prevStrategiesRef = useRef<string>('');
+
+    // Smart fetch that only updates state if data changed
+    const fetchStrategies = useCallback(async () => {
+        // Skip if tab is not visible
+        if (document.hidden) return;
+
+        try {
+            setIsLoading(true);
+            const running = await strategyManager.getRunningStrategies();
+            const newData = running || [];
+
+            // Only update state if data actually changed
+            const newDataStr = JSON.stringify(newData);
+            if (newDataStr !== prevStrategiesRef.current) {
+                prevStrategiesRef.current = newDataStr;
+                setStrategies(newData);
             }
-        };
-
-        fetchStrategies();
-
-        // Poll every 5 seconds for updates
-        const interval = setInterval(fetchStrategies, 5000);
-        return () => clearInterval(interval);
+        } catch (error) {
+            console.error('Failed to fetch strategies:', error);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
 
-    const handleClosePosition = async (strategyId: string, positionId: string) => {
-        console.log('Close position:', strategyId, positionId);
-        // TODO: Implement position closing
-    };
+    // Smart polling with visibility check
+    useEffect(() => {
+        // Initial fetch
+        fetchStrategies();
 
-    const handlePauseStrategy = async (id: string) => {
-        console.log('Pause strategy:', id);
-        // TODO: Implement pause
-    };
+        // Poll every 15 seconds instead of 5 (reduced frequency)
+        const interval = setInterval(fetchStrategies, 15000);
 
-    const handleStopStrategy = async (id: string) => {
+        // Also fetch when tab becomes visible
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                fetchStrategies();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchStrategies]);
+
+    const handleStopStrategy = useCallback(async (id: string) => {
         try {
             await strategyManager.stopLiveStrategy(id);
-            // Refresh strategies list
-            const running = await strategyManager.getRunningStrategies();
-            setStrategies(running || []);
+            // Refresh strategies list immediately after stopping
+            prevStrategiesRef.current = ''; // Force update
+            await fetchStrategies();
         } catch (error) {
             console.error('Failed to stop strategy:', error);
             alert(`Failed to stop strategy: ${error}`);
         }
-    };
+    }, [fetchStrategies]);
 
-
-    const filteredStrategies = strategies.filter(s => {
-        if (filterStatus === 'all') return true;
-        const status = s.IsRunning ? 'running' : 'paused';
-        return status === filterStatus;
-    });
+    // Memoized filtered strategies
+    const filteredStrategies = useMemo(() => {
+        return strategies.filter(s => {
+            if (filterStatus === 'all') return true;
+            const status = s.IsRunning ? 'running' : 'paused';
+            return status === filterStatus;
+        });
+    }, [strategies, filterStatus]);
 
     return (
         <div className="p-6 space-y-6">
@@ -183,97 +302,11 @@ export function ActiveStrategiesTab() {
 
             <div className="grid gap-4">
                 {filteredStrategies.map((strategy) => (
-                    <Card key={strategy.id}>
-                        <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex items-center gap-3">
-                                        <CardTitle className="text-lg">{strategy.Strategy?.name || strategy.ID}</CardTitle>
-                                        <Badge variant={strategy.IsRunning ? 'default' : 'secondary'}>
-                                            {strategy.IsRunning ? 'running' : 'stopped'}
-                                        </Badge>
-                                        <span className="text-sm text-muted-foreground">
-                                            {strategy.Symbol}/USD · {strategy.Interval}
-                                        </span>
-                                    </div>
-                                    {strategy.Config?.Parameters && (
-                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                            {Object.entries(strategy.Config.Parameters).map(([key, value]) => (
-                                                <span key={key}>
-                                                    <span className="capitalize">{key}:</span>{' '}
-                                                    <span className="font-medium text-foreground">
-                                                        {typeof value === 'number' ? value.toFixed(2) : String(value)}
-                                                    </span>
-                                                </span>
-                                            ))}
-                                            <span>
-                                                TP: <span className="font-medium text-green-400">{strategy.Config.TakeProfitPercent}%</span>
-                                            </span>
-                                            <span>
-                                                SL: <span className="font-medium text-red-400">{strategy.Config.StopLossPercent}%</span>
-                                            </span>
-                                            <span>
-                                                Dir: <span className="font-medium text-foreground capitalize">{strategy.Config.TradeDirection || 'both'}</span>
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex gap-2">
-                                    {strategy.IsRunning && !strategy.Position?.IsOpen && (
-                                        <>
-                                            <Button variant="destructive" size="sm" onClick={() => handleStopStrategy(strategy.ID)}>
-                                                Stop
-                                            </Button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {strategy.Position?.IsOpen ? (
-                                <div className="space-y-3">
-                                    <div className="border rounded-lg p-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <Badge variant={strategy.Position.Side === 'long' ? 'default' : 'destructive'} className="text-xs">
-                                                    {strategy.Position.Side.toUpperCase()}
-                                                </Badge>
-                                                <span className="font-semibold">{strategy.Symbol}/USD</span>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleStopStrategy(strategy.ID)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-
-                                        <div className="grid grid-cols-4 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-muted-foreground">Entry Price</p>
-                                                <p className="font-medium">${strategy.Position.EntryPrice?.toFixed(2) || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-muted-foreground">Size</p>
-                                                <p className="font-medium">{strategy.Position.Size} {strategy.Symbol}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-muted-foreground">TP Target</p>
-                                                <p className="font-medium text-green-400">${(strategy.Position.EntryPrice * (1 + strategy.Config.TakeProfitPercent / 100)).toFixed(2)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-muted-foreground">SL Target</p>
-                                                <p className="font-medium text-red-400">${(strategy.Position.EntryPrice * (1 - strategy.Config.StopLossPercent / 100)).toFixed(2)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">No active positions</p>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <StrategyCard
+                        key={strategy.ID || strategy.id}
+                        strategy={strategy}
+                        onStop={handleStopStrategy}
+                    />
                 ))}
             </div>
 

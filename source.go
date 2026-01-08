@@ -169,8 +169,12 @@ func (s *Source) fetchSingleBatch(symbol string, interval string, limit int, bef
 	intervalDuration := s.intervalDuration(interval)
 	startTime := endTime.Add(-time.Duration(limit) * intervalDuration)
 
+	// Use proper context with timeout instead of context.TODO()
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+	defer cancel()
+
 	candles, err := s.info.CandlesSnapshot(
-		context.TODO(),
+		ctx,
 		symbol,
 		interval,
 		startTime.Unix()*1000,
@@ -207,13 +211,29 @@ func (s *Source) InvalidateCache() error {
 	if !s.cacheEnabled {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
-	iter := s.redisClient.Scan(ctx, 0, "candles:*", 0).Iterator()
+
+	// Collect keys first
+	var keys []string
+	iter := s.redisClient.Scan(ctx, 0, "candles:*", 100).Iterator()
 	for iter.Next(ctx) {
-		s.redisClient.Del(ctx, iter.Val())
+		keys = append(keys, iter.Val())
 	}
-	return iter.Err()
+	if err := iter.Err(); err != nil {
+		return err
+	}
+
+	// Batch delete using pipeline
+	if len(keys) > 0 {
+		pipe := s.redisClient.Pipeline()
+		for _, key := range keys {
+			pipe.Del(ctx, key)
+		}
+		_, err := pipe.Exec(ctx)
+		return err
+	}
+	return nil
 }
 
 func (s *Source) InvalidateCacheForSymbol(symbol string) error {
@@ -221,11 +241,27 @@ func (s *Source) InvalidateCacheForSymbol(symbol string) error {
 		return nil
 	}
 	pattern := fmt.Sprintf("candles:%s:*", symbol)
-	ctx, cancel := context.WithTimeout(s.ctx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
-	iter := s.redisClient.Scan(ctx, 0, pattern, 0).Iterator()
+
+	// Collect keys first
+	var keys []string
+	iter := s.redisClient.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
-		s.redisClient.Del(ctx, iter.Val())
+		keys = append(keys, iter.Val())
 	}
-	return iter.Err()
+	if err := iter.Err(); err != nil {
+		return err
+	}
+
+	// Batch delete using pipeline
+	if len(keys) > 0 {
+		pipe := s.redisClient.Pipeline()
+		for _, key := range keys {
+			pipe.Del(ctx, key)
+		}
+		_, err := pipe.Exec(ctx)
+		return err
+	}
+	return nil
 }

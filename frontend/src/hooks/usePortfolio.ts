@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { GetPortfolioSummary, GetWalletAddress } from '@/../wailsjs/go/main/App';
-import { hyperliquid, main } from "@/../wailsjs/go/models";
+import { main } from "@/../wailsjs/go/models";
 
 export function usePortfolio() {
     const [portfolio, setPortfolio] = useState<main.PortfolioSummary | null>(null);
@@ -9,7 +9,13 @@ export function usePortfolio() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchPortfolio = async () => {
+    // Track previous data to avoid unnecessary re-renders
+    const prevPortfolioRef = useRef<string>('');
+
+    const fetchPortfolio = useCallback(async () => {
+        // Skip if tab is not visible
+        if (document.hidden) return;
+
         if (!GetPortfolioSummary) {
             setError('Wallet functions not available');
             return;
@@ -23,21 +29,46 @@ export function usePortfolio() {
             setAddress(addr);
 
             const data = await GetPortfolioSummary();
-            setPortfolio(data);
+
+            // Only update state if data actually changed
+            const newDataStr = JSON.stringify(data);
+            if (newDataStr !== prevPortfolioRef.current) {
+                prevPortfolioRef.current = newDataStr;
+                setPortfolio(data);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch portfolio');
             console.error('Portfolio fetch error:', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchPortfolio();
-        // Refresh every 10 seconds
-        const interval = setInterval(fetchPortfolio, 10000);
-        return () => clearInterval(interval);
-    }, []);
+
+        // Refresh every 30 seconds instead of 10 (reduced frequency)
+        const interval = setInterval(fetchPortfolio, 30000);
+
+        // Also fetch when tab becomes visible
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                fetchPortfolio();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchPortfolio]);
+
+    // Force refresh (resets cache check)
+    const refresh = useCallback(() => {
+        prevPortfolioRef.current = ''; // Force update
+        return fetchPortfolio();
+    }, [fetchPortfolio]);
 
     return {
         portfolio,
@@ -45,6 +76,6 @@ export function usePortfolio() {
         address,
         loading,
         error,
-        refresh: fetchPortfolio,
+        refresh,
     };
 }

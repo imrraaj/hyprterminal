@@ -10,6 +10,7 @@ import {
   createSeriesMarkers,
 } from "lightweight-charts";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useChartStore } from "../store/chartStore";
 import { useVisualizationStore } from "../store/visualizationStore";
 import { hyperliquid } from "@/../wailsjs/go/models";
@@ -37,10 +38,17 @@ export const TradingChart = ({ intervalSeconds }: TradingChartProps) => {
   const isLoadingMore = useRef(false);
   const strategyManager = TradingStrategyManager.getInstance();
 
-  const { chartData } = useChartStore();
-  const { tradeDirection, showEntryPrices } = useVisualizationStore();
-  const { candles, strategyOutput, symbol, loadedRange, totalAvailable } =
-    chartData;
+  // Selective Zustand subscriptions for better performance
+  const candles = useChartStore((state) => state.chartData.candles);
+  const strategyOutput = useChartStore((state) => state.chartData.strategyOutput);
+  const symbol = useChartStore((state) => state.chartData.symbol);
+
+  const { tradeDirection, showEntryPrices } = useVisualizationStore(
+    useShallow((state) => ({
+      tradeDirection: state.tradeDirection,
+      showEntryPrices: state.showEntryPrices,
+    }))
+  );
 
   const LOAD_THRESHOLD = 100;
 
@@ -338,26 +346,27 @@ export const TradingChart = ({ intervalSeconds }: TradingChartProps) => {
     prevStrategyHash.current = strategyHash;
   }, [strategyOutput, strategyHash, candles]);
 
-  const handleChartClick = (e: React.MouseEvent) => {
+  // Memoized event handlers
+  const handleChartClick = useCallback((e: React.MouseEvent) => {
     if (!chartInstanceRef.current || !candleSeriesRef.current) return;
     const rect = chartRef.current?.getBoundingClientRect();
     if (!rect) return;
     const y = e.clientY - rect.top;
     const price = candleSeriesRef.current.coordinateToPrice(y);
     if (price) setClickedPrice(price);
-  };
+  }, []);
 
-  const resetChart = () => {
+  const resetChart = useCallback(() => {
     if (chartInstanceRef.current) {
       chartInstanceRef.current.timeScale().fitContent();
     }
-  };
+  }, []);
 
-  const copyPrice = () => {
+  const copyPrice = useCallback(() => {
     if (clickedPrice) {
       navigator.clipboard.writeText(clickedPrice.toFixed(2));
     }
-  };
+  }, [clickedPrice]);
 
   return (
     <ContextMenu>

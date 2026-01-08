@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useCallback, useMemo, memo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { useDebouncedCallback } from "use-debounce";
 import { TradingChart } from "@/components/TradingChart";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,8 +38,45 @@ import { TIMEFRAMES, SYMBOLS } from "@/config/trading";
 
 const strategyManager = TradingStrategyManager.getInstance();
 
+// Memoized trade row component to prevent re-renders
+const TradeRow = memo(({ position, index, formatDate }: {
+    position: main.Position;
+    index: number;
+    formatDate: (ts: number) => string;
+}) => (
+    <TableRow
+        className={position.PnL >= 0 ? "bg-green-500/5" : "bg-red-500/5"}
+    >
+        <TableCell className="font-medium">{index + 1}</TableCell>
+        <TableCell>
+            <Badge variant={position.Side === "long" ? "default" : "secondary"}>
+                {position.Side.toUpperCase()}
+            </Badge>
+        </TableCell>
+        <TableCell className="font-mono">${position.EntryPrice.toFixed(2)}</TableCell>
+        <TableCell className="font-mono">${position.ExitPrice.toFixed(2)}</TableCell>
+        <TableCell className="font-mono">{position.Size.toFixed(4)}</TableCell>
+        <TableCell className={`font-semibold ${position.PnL >= 0 ? "text-green-500" : "text-red-500"}`}>
+            ${position.PnL.toFixed(2)}
+        </TableCell>
+        <TableCell className={`font-semibold ${position.PnLPercentage >= 0 ? "text-green-500" : "text-red-500"}`}>
+            {position.PnLPercentage >= 0 ? "+" : ""}{position.PnLPercentage.toFixed(2)}%
+        </TableCell>
+        <TableCell>
+            <Badge variant="outline" className="text-xs">{position.ExitReason}</Badge>
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground">{formatDate(position.EntryTime)}</TableCell>
+        <TableCell className="text-xs text-muted-foreground">{formatDate(position.ExitTime)}</TableCell>
+    </TableRow>
+));
+TradeRow.displayName = "TradeRow";
+
 export function VisualizationTab() {
-    const { chartData, updateStrategyOutput } = useChartStore();
+    // Selective Zustand subscriptions - only subscribe to what we need
+    const strategyOutput = useChartStore((state) => state.chartData.strategyOutput);
+    const updateStrategyOutput = useChartStore((state) => state.updateStrategyOutput);
+
+    // Group related visualization state together with useShallow
     const {
         symbol,
         timeframe,
@@ -50,6 +89,24 @@ export function VisualizationTab() {
         cachedStrategyOutput,
         cacheKey,
         showEntryPrices,
+    } = useVisualizationStore(
+        useShallow((state) => ({
+            symbol: state.symbol,
+            timeframe: state.timeframe,
+            selectedStrategy: state.selectedStrategy,
+            strategyParams: state.strategyParams,
+            takeProfitPercent: state.takeProfitPercent,
+            stopLossPercent: state.stopLossPercent,
+            tradeDirection: state.tradeDirection,
+            strategyApplied: state.strategyApplied,
+            cachedStrategyOutput: state.cachedStrategyOutput,
+            cacheKey: state.cacheKey,
+            showEntryPrices: state.showEntryPrices,
+        }))
+    );
+
+    // Separate subscription for setters (they don't change, so this is stable)
+    const {
         setSymbol,
         setTimeframe,
         setSelectedStrategy,
@@ -60,7 +117,23 @@ export function VisualizationTab() {
         setStrategyApplied,
         setCachedStrategyOutput,
         setShowEntryPrices,
-    } = useVisualizationStore();
+    } = useVisualizationStore(
+        useShallow((state) => ({
+            setSymbol: state.setSymbol,
+            setTimeframe: state.setTimeframe,
+            setSelectedStrategy: state.setSelectedStrategy,
+            setStrategyParams: state.setStrategyParams,
+            setTakeProfitPercent: state.setTakeProfitPercent,
+            setStopLossPercent: state.setStopLossPercent,
+            setTradeDirection: state.setTradeDirection,
+            setStrategyApplied: state.setStrategyApplied,
+            setCachedStrategyOutput: state.setCachedStrategyOutput,
+            setShowEntryPrices: state.setShowEntryPrices,
+        }))
+    );
+
+    // Local state for visible trades count (pagination)
+    const [visibleTradesCount, setVisibleTradesCount] = useState(50);
 
     const LIMIT = 7000;
     const INITIAL_VIEWPORT = 1000;
@@ -88,17 +161,20 @@ export function VisualizationTab() {
         }
     }, [symbol, timeframe]);
 
-    const currentTimeframe =
-        TIMEFRAMES.find((tf) => tf.value === timeframe) || TIMEFRAMES[3];
+    const currentTimeframe = useMemo(
+        () => TIMEFRAMES.find((tf) => tf.value === timeframe) || TIMEFRAMES[3],
+        [timeframe]
+    );
 
-    const handleStrategyChange = (strategyId: string) => {
+    // Memoized handlers with useCallback
+    const handleStrategyChange = useCallback((strategyId: string) => {
         const strategy = STRATEGIES.find((s) => s.id === strategyId);
         if (strategy) {
             setSelectedStrategy(strategy);
         }
-    };
+    }, [setSelectedStrategy]);
 
-    const handleApplyStrategy = async () => {
+    const handleApplyStrategy = useCallback(async () => {
         try {
             const paramsWithTPSL = {
                 ...strategyParams,
@@ -117,16 +193,19 @@ export function VisualizationTab() {
 
             setStrategyApplied(true);
 
-            // Cache the strategy output
-            if (chartData.strategyOutput) {
-                setCachedStrategyOutput(chartData.strategyOutput, generateCacheKey());
-            }
+            // Cache the strategy output after a small delay to ensure state is updated
+            setTimeout(() => {
+                const output = useChartStore.getState().chartData.strategyOutput;
+                if (output) {
+                    setCachedStrategyOutput(output, generateCacheKey());
+                }
+            }, 100);
         } catch (error) {
             console.error("Failed to apply strategy:", error);
         }
-    };
+    }, [symbol, currentTimeframe.value, selectedStrategy.id, strategyParams, takeProfitPercent, stopLossPercent, tradeDirection, setStrategyApplied, setCachedStrategyOutput]);
 
-    const handleStartStrategy = async () => {
+    const handleStartStrategy = useCallback(async () => {
         try {
             if (!strategyApplied) {
                 alert("Please apply strategy first");
@@ -154,9 +233,26 @@ export function VisualizationTab() {
             console.error("Failed to start strategy:", error);
             alert(`Failed to start strategy: ${error}`);
         }
-    };
+    }, [strategyApplied, selectedStrategy, symbol, timeframe, strategyParams, takeProfitPercent, stopLossPercent, tradeDirection]);
 
-    const renderParameter = (param: StrategyParameter) => {
+    // Debounced parameter update to prevent excessive re-renders
+    const debouncedSetStrategyParams = useDebouncedCallback(
+        (params: Record<string, any>) => setStrategyParams(params),
+        150
+    );
+
+    // Debounced number input handlers
+    const debouncedSetTakeProfit = useDebouncedCallback(
+        (value: number) => setTakeProfitPercent(value),
+        150
+    );
+
+    const debouncedSetStopLoss = useDebouncedCallback(
+        (value: number) => setStopLossPercent(value),
+        150
+    );
+
+    const renderParameter = useCallback((param: StrategyParameter) => {
         if (param.type === "input") {
             if (param.inputType === "color") {
                 return (
@@ -165,9 +261,9 @@ export function VisualizationTab() {
                         <div className="flex gap-2">
                             <input
                                 type="color"
-                                value={strategyParams[param.name]}
+                                defaultValue={strategyParams[param.name]}
                                 onChange={(e) =>
-                                    setStrategyParams({
+                                    debouncedSetStrategyParams({
                                         ...strategyParams,
                                         [param.name]: e.target.value,
                                     })
@@ -177,9 +273,9 @@ export function VisualizationTab() {
                             <Input
                                 id={param.name}
                                 type="text"
-                                value={strategyParams[param.name]}
+                                defaultValue={strategyParams[param.name]}
                                 onChange={(e) =>
-                                    setStrategyParams({
+                                    debouncedSetStrategyParams({
                                         ...strategyParams,
                                         [param.name]: e.target.value,
                                     })
@@ -199,9 +295,9 @@ export function VisualizationTab() {
                         step={param.step}
                         min={param.min}
                         max={param.max}
-                        value={strategyParams[param.name]}
+                        defaultValue={strategyParams[param.name]}
                         onChange={(e) =>
-                            setStrategyParams({
+                            debouncedSetStrategyParams({
                                 ...strategyParams,
                                 [param.name]:
                                     param.inputType === "number"
@@ -246,13 +342,27 @@ export function VisualizationTab() {
         }
 
         return null;
-    };
+    }, [strategyParams, setStrategyParams, debouncedSetStrategyParams]);
 
-    // Format timestamp to readable date
-    const formatDate = (timestamp: number) => {
+    // Format timestamp to readable date - memoized
+    const formatDate = useCallback((timestamp: number) => {
         if (!timestamp) return "N/A";
         return new Date(timestamp).toLocaleString();
-    };
+    }, []);
+
+    // Visible trades for pagination
+    const visibleTrades = useMemo(() => {
+        if (!strategyOutput?.Positions) return [];
+        return strategyOutput.Positions.slice(0, visibleTradesCount);
+    }, [strategyOutput?.Positions, visibleTradesCount]);
+
+    const hasMoreTrades = useMemo(() => {
+        return (strategyOutput?.Positions?.length || 0) > visibleTradesCount;
+    }, [strategyOutput?.Positions?.length, visibleTradesCount]);
+
+    const loadMoreTrades = useCallback(() => {
+        setVisibleTradesCount(prev => prev + 50);
+    }, []);
 
     return (
         <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
@@ -413,9 +523,9 @@ export function VisualizationTab() {
                                         step="0.1"
                                         min="0.1"
                                         max="100"
-                                        value={takeProfitPercent}
+                                        defaultValue={takeProfitPercent}
                                         onChange={(e) =>
-                                            setTakeProfitPercent(
+                                            debouncedSetTakeProfit(
                                                 parseFloat(e.target.value)
                                             )
                                         }
@@ -436,9 +546,9 @@ export function VisualizationTab() {
                                         step="0.1"
                                         min="0.1"
                                         max="100"
-                                        value={stopLossPercent}
+                                        defaultValue={stopLossPercent}
                                         onChange={(e) =>
-                                            setStopLossPercent(
+                                            debouncedSetStopLoss(
                                                 parseFloat(e.target.value)
                                             )
                                         }
@@ -476,20 +586,13 @@ export function VisualizationTab() {
                 <CardHeader>
                     <CardTitle className="text-lg">Backtest Results</CardTitle>
                     <CardDescription>
-                        {strategyApplied &&
-                        chartData.strategyOutput
-                            ? `${chartData.strategyOutput.StrategyName} v${
-                                  chartData.strategyOutput.StrategyVersion
-                              } - ${
-                                  chartData.strategyOutput
-                                      .Positions?.length || 0
-                              } trades executed`
+                        {strategyApplied && strategyOutput
+                            ? `${strategyOutput.StrategyName} v${strategyOutput.StrategyVersion} - ${strategyOutput.Positions?.length || 0} trades executed`
                             : "No backtest results - apply a strategy to see results"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {strategyApplied &&
-                    chartData.strategyOutput ? (
+                    {strategyApplied && strategyOutput ? (
                         <>
                             {/* Strategy Parameters */}
                             <div className="bg-muted/50 rounded-lg p-4">
@@ -530,19 +633,19 @@ export function VisualizationTab() {
                                     </p>
                                     <p
                                         className={`text-2xl font-bold ${
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .TotalPnL >= 0
                                                 ? "text-green-500"
                                                 : "text-red-500"
                                         }`}
                                     >
                                         $
-                                        {chartData.strategyOutput.TotalPnL.toFixed(
+                                        {strategyOutput.TotalPnL.toFixed(
                                             2
                                         )}
                                         <span className="text-sm ml-2">
-                                            ({chartData.strategyOutput.TotalPnLPercent >= 0 ? '+' : ''}
-                                            {chartData.strategyOutput.TotalPnLPercent.toFixed(2)}%)
+                                            ({strategyOutput.TotalPnLPercent >= 0 ? '+' : ''}
+                                            {strategyOutput.TotalPnLPercent.toFixed(2)}%)
                                         </span>
                                     </p>
                                 </div>
@@ -551,7 +654,7 @@ export function VisualizationTab() {
                                         Win Rate
                                     </p>
                                     <p className="text-2xl font-bold">
-                                        {chartData.strategyOutput.WinRate.toFixed(
+                                        {strategyOutput.WinRate.toFixed(
                                             1
                                         )}
                                         %
@@ -563,14 +666,14 @@ export function VisualizationTab() {
                                     </p>
                                     <p
                                         className={`text-2xl font-bold ${
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .ProfitFactor >=
                                             1
                                                 ? "text-green-500"
                                                 : "text-red-500"
                                         }`}
                                     >
-                                        {chartData.strategyOutput.ProfitFactor.toFixed(
+                                        {strategyOutput.ProfitFactor.toFixed(
                                             2
                                         )}
                                     </p>
@@ -581,7 +684,7 @@ export function VisualizationTab() {
                                     </p>
                                     <p className="text-2xl font-bold">
                                         {
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .TotalTrades
                                         }
                                     </p>
@@ -598,7 +701,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-green-500">
                                         {
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .WinningTrades
                                         }
                                     </span>
@@ -609,7 +712,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-red-500">
                                         {
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .LosingTrades
                                         }
                                     </span>
@@ -620,7 +723,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-green-500">
                                         $
-                                        {chartData.strategyOutput.AverageWin.toFixed(
+                                        {strategyOutput.AverageWin.toFixed(
                                             2
                                         )}
                                     </span>
@@ -632,7 +735,7 @@ export function VisualizationTab() {
                                     <span className="font-medium text-red-500">
                                         $
                                         {Math.abs(
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .AverageLoss
                                         ).toFixed(2)}
                                     </span>
@@ -643,7 +746,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-red-500">
                                         $
-                                        {chartData.strategyOutput.MaxDrawdown.toFixed(
+                                        {strategyOutput.MaxDrawdown.toFixed(
                                             2
                                         )}
                                     </span>
@@ -653,7 +756,7 @@ export function VisualizationTab() {
                                         Sharpe Ratio
                                     </span>
                                     <span className="font-medium">
-                                        {chartData.strategyOutput.SharpeRatio.toFixed(
+                                        {strategyOutput.SharpeRatio.toFixed(
                                             2
                                         )}
                                     </span>
@@ -664,7 +767,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-green-500">
                                         {
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .LongestWinStreak
                                         }
                                     </span>
@@ -675,7 +778,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-red-500">
                                         {
-                                            chartData.strategyOutput
+                                            strategyOutput
                                                 .LongestLossStreak
                                         }
                                     </span>
@@ -684,142 +787,50 @@ export function VisualizationTab() {
 
                             <Separator />
 
-                            {/* Trades Table */}
-                            {chartData.strategyOutput.Positions &&
-                            chartData.strategyOutput.Positions
-                                .length > 0 ? (
+                            {/* Trades Table - with pagination for performance */}
+                            {strategyOutput.Positions && strategyOutput.Positions.length > 0 ? (
                                 <div>
-                                    <h3 className="font-semibold mb-3">
-                                        Trade History
-                                    </h3>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="font-semibold">Trade History</h3>
+                                        <span className="text-sm text-muted-foreground">
+                                            Showing {visibleTrades.length} of {strategyOutput.Positions.length} trades
+                                        </span>
+                                    </div>
                                     <div className="max-h-80 overflow-y-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="w-12">
-                                                        #
-                                                    </TableHead>
+                                                    <TableHead className="w-12">#</TableHead>
                                                     <TableHead>Side</TableHead>
-                                                    <TableHead>
-                                                        Entry Price
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Exit Price
-                                                    </TableHead>
+                                                    <TableHead>Entry Price</TableHead>
+                                                    <TableHead>Exit Price</TableHead>
                                                     <TableHead>Size</TableHead>
                                                     <TableHead>PnL</TableHead>
                                                     <TableHead>PnL %</TableHead>
-                                                    <TableHead>
-                                                        Exit Reason
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Entry Time
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Exit Time
-                                                    </TableHead>
+                                                    <TableHead>Exit Reason</TableHead>
+                                                    <TableHead>Entry Time</TableHead>
+                                                    <TableHead>Exit Time</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {chartData.strategyOutput.Positions.map(
-                                                    (position: main.Position, index: number) => (
-                                                        <TableRow
-                                                            key={index}
-                                                            className={
-                                                                position.PnL >=
-                                                                0
-                                                                    ? "bg-green-500/5"
-                                                                    : "bg-red-500/5"
-                                                            }
-                                                        >
-                                                            <TableCell className="font-medium">
-                                                                {index + 1}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge
-                                                                    variant={
-                                                                        position.Side ===
-                                                                        "long"
-                                                                            ? "default"
-                                                                            : "secondary"
-                                                                    }
-                                                                >
-                                                                    {position.Side.toUpperCase()}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="font-mono">
-                                                                $
-                                                                {position.EntryPrice.toFixed(
-                                                                    2
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="font-mono">
-                                                                $
-                                                                {position.ExitPrice.toFixed(
-                                                                    2
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="font-mono">
-                                                                {position.Size.toFixed(
-                                                                    4
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell
-                                                                className={`font-semibold ${
-                                                                    position.PnL >=
-                                                                    0
-                                                                        ? "text-green-500"
-                                                                        : "text-red-500"
-                                                                }`}
-                                                            >
-                                                                $
-                                                                {position.PnL.toFixed(
-                                                                    2
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell
-                                                                className={`font-semibold ${
-                                                                    position.PnLPercentage >=
-                                                                    0
-                                                                        ? "text-green-500"
-                                                                        : "text-red-500"
-                                                                }`}
-                                                            >
-                                                                {position.PnLPercentage >=
-                                                                0
-                                                                    ? "+"
-                                                                    : ""}
-                                                                {position.PnLPercentage.toFixed(
-                                                                    2
-                                                                )}
-                                                                %
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {
-                                                                        position.ExitReason
-                                                                    }
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="text-xs text-muted-foreground">
-                                                                {formatDate(
-                                                                    position.EntryTime
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-xs text-muted-foreground">
-                                                                {formatDate(
-                                                                    position.ExitTime
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )
-                                                )}
+                                                {visibleTrades.map((position: main.Position, index: number) => (
+                                                    <TradeRow
+                                                        key={index}
+                                                        position={position}
+                                                        index={index}
+                                                        formatDate={formatDate}
+                                                    />
+                                                ))}
                                             </TableBody>
                                         </Table>
                                     </div>
+                                    {hasMoreTrades && (
+                                        <div className="mt-3 text-center">
+                                            <Button variant="outline" size="sm" onClick={loadMoreTrades}>
+                                                Load More Trades
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground">

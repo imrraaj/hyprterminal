@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
 type StrategyEngine struct {
-	strategies map[string]*MaxTrendPointsStrategy
-	source     Source
+	strategies   map[string]*MaxTrendPointsStrategy
+	strategiesMu sync.RWMutex
+	source       Source
 }
 
 func NewStrategyEngine(source *Source) *StrategyEngine {
@@ -19,6 +21,9 @@ func NewStrategyEngine(source *Source) *StrategyEngine {
 }
 
 func (e *StrategyEngine) StartStrategy(id string, strategy MaxTrendPointsStrategy) error {
+	e.strategiesMu.Lock()
+	defer e.strategiesMu.Unlock()
+
 	if _, exists := e.strategies[id]; exists {
 		return fmt.Errorf("strategy %s already running", id)
 	}
@@ -34,23 +39,30 @@ func (e *StrategyEngine) StartStrategy(id string, strategy MaxTrendPointsStrateg
 }
 
 func (e *StrategyEngine) StopStrategy(name string) error {
+	e.strategiesMu.Lock()
 	live, exists := e.strategies[name]
 	if !exists {
+		e.strategiesMu.Unlock()
 		return fmt.Errorf("strategy %s not found", name)
 	}
 
 	live.IsRunning = false
 	live.cancel()
+	delete(e.strategies, name)
+	e.strategiesMu.Unlock()
 
+	// Close position outside lock to avoid blocking other operations
 	if live.Position != nil && live.Position.IsOpen {
 		live.ClosePosition("Strategy Stopped")
 	}
 
-	delete(e.strategies, name)
 	return nil
 }
 
 func (e *StrategyEngine) GetRunningStrategies() []MaxTrendPointsStrategy {
+	e.strategiesMu.RLock()
+	defer e.strategiesMu.RUnlock()
+
 	result := make([]MaxTrendPointsStrategy, 0, len(e.strategies))
 	for _, live := range e.strategies {
 		result = append(result, *live)
@@ -59,7 +71,14 @@ func (e *StrategyEngine) GetRunningStrategies() []MaxTrendPointsStrategy {
 }
 
 func (e *StrategyEngine) StopAllStrategies() {
+	e.strategiesMu.RLock()
+	ids := make([]string, 0, len(e.strategies))
 	for id := range e.strategies {
+		ids = append(ids, id)
+	}
+	e.strategiesMu.RUnlock()
+
+	for _, id := range ids {
 		e.StopStrategy(id)
 	}
 }
