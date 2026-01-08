@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
 )
 
 //go:embed all:frontend/dist
@@ -21,10 +22,13 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		Bind: []any{
 			app,
+		},
+		Linux: &linux.Options{
+			WebviewGpuPolicy: linux.WebviewGpuPolicyAlways,
 		},
 	})
 

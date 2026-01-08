@@ -1,4 +1,2 @@
-[ ] - Automatic trade execution engine in golang
-[ ] - Backtesting framework
-[ ] - Hyperliquid Testnet integration
-[ ] - Hyperliquid Integration
+[ ] Support for multiple exchanges
+[ ] Support for multiple strategies
