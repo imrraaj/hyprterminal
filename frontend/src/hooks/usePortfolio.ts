@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GetPortfolioSummary, GetWalletAddress } from '@/../wailsjs/go/main/App';
-import { main } from "@/../wailsjs/go/models";
+import { GetPortfolioSummary, GetWalletAddress } from '@/../wailsjs/go/app/App';
+import { exchange } from "@/../wailsjs/go/models";
 
 export function usePortfolio() {
-    const [portfolio, setPortfolio] = useState<main.PortfolioSummary | null>(null);
-    const [isConnected, setIsConnected] = useState(false);
+    const [portfolio, setPortfolio] = useState<exchange.PortfolioSummary | null>(null);
     const [address, setAddress] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -72,7 +71,6 @@ export function usePortfolio() {
 
     return {
         portfolio,
-        isConnected,
         address,
         loading,
         error,

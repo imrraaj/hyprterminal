@@ -30,7 +30,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { STRATEGIES, StrategyParameter } from "@/types/strategy";
-import { main } from "@/../wailsjs/go/models";
+import { engine, exchange } from "@/../wailsjs/go/models";
 import { TradingStrategyManager } from "@/lib/TradingStrategyManager";
 import { useChartStore } from "@/store/chartStore";
 import { useVisualizationStore } from "@/store/visualizationStore";
@@ -40,33 +40,33 @@ const strategyManager = TradingStrategyManager.getInstance();
 
 // Memoized trade row component to prevent re-renders
 const TradeRow = memo(({ position, index, formatDate }: {
-    position: main.Position;
+    position: exchange.Position;
     index: number;
     formatDate: (ts: number) => string;
 }) => (
     <TableRow
-        className={position.PnL >= 0 ? "bg-green-500/5" : "bg-red-500/5"}
+        className={position.pnl >= 0 ? "bg-green-500/5" : "bg-red-500/5"}
     >
         <TableCell className="font-medium">{index + 1}</TableCell>
         <TableCell>
-            <Badge variant={position.Side === "long" ? "default" : "secondary"}>
-                {position.Side.toUpperCase()}
+            <Badge variant={position.side === "long" ? "default" : "secondary"}>
+                {position.side.toUpperCase()}
             </Badge>
         </TableCell>
-        <TableCell className="font-mono">${position.EntryPrice.toFixed(2)}</TableCell>
-        <TableCell className="font-mono">${position.ExitPrice.toFixed(2)}</TableCell>
-        <TableCell className="font-mono">{position.Size.toFixed(4)}</TableCell>
-        <TableCell className={`font-semibold ${position.PnL >= 0 ? "text-green-500" : "text-red-500"}`}>
-            ${position.PnL.toFixed(2)}
+        <TableCell className="font-mono">${position.entryPrice.toFixed(2)}</TableCell>
+        <TableCell className="font-mono">${position.exitPrice.toFixed(2)}</TableCell>
+        <TableCell className="font-mono">{position.size.toFixed(4)}</TableCell>
+        <TableCell className={`font-semibold ${position.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+            ${position.pnl.toFixed(2)}
         </TableCell>
-        <TableCell className={`font-semibold ${position.PnLPercentage >= 0 ? "text-green-500" : "text-red-500"}`}>
-            {position.PnLPercentage >= 0 ? "+" : ""}{position.PnLPercentage.toFixed(2)}%
+        <TableCell className={`font-semibold ${position.pnlPercentage >= 0 ? "text-green-500" : "text-red-500"}`}>
+            {position.pnlPercentage >= 0 ? "+" : ""}{position.pnlPercentage.toFixed(2)}%
         </TableCell>
         <TableCell>
-            <Badge variant="outline" className="text-xs">{position.ExitReason}</Badge>
+            <Badge variant="outline" className="text-xs">{position.exitReason}</Badge>
         </TableCell>
-        <TableCell className="text-xs text-muted-foreground">{formatDate(position.EntryTime)}</TableCell>
-        <TableCell className="text-xs text-muted-foreground">{formatDate(position.ExitTime)}</TableCell>
+        <TableCell className="text-xs text-muted-foreground">{formatDate(position.entryTime)}</TableCell>
+        <TableCell className="text-xs text-muted-foreground">{formatDate(position.exitTime)}</TableCell>
     </TableRow>
 ));
 TradeRow.displayName = "TradeRow";
@@ -212,7 +212,7 @@ export function VisualizationTab() {
                 return;
             }
 
-            const strategyId = `${selectedStrategy.id}-${symbol}-${timeframe}-${Date.now()}`;
+            const instanceId = `${selectedStrategy.id}-${symbol}-${timeframe}-${Date.now()}`;
 
             const params = {
                 ...strategyParams,
@@ -222,7 +222,8 @@ export function VisualizationTab() {
             };
 
             await strategyManager.startLiveStrategy(
-                strategyId,
+                instanceId,
+                selectedStrategy.id,
                 symbol,
                 timeframe,
                 params
@@ -352,13 +353,13 @@ export function VisualizationTab() {
 
     // Visible trades for pagination
     const visibleTrades = useMemo(() => {
-        if (!strategyOutput?.Positions) return [];
-        return strategyOutput.Positions.slice(0, visibleTradesCount);
-    }, [strategyOutput?.Positions, visibleTradesCount]);
+        if (!strategyOutput?.positions) return [];
+        return strategyOutput.positions.slice(0, visibleTradesCount);
+    }, [strategyOutput?.positions, visibleTradesCount]);
 
     const hasMoreTrades = useMemo(() => {
-        return (strategyOutput?.Positions?.length || 0) > visibleTradesCount;
-    }, [strategyOutput?.Positions?.length, visibleTradesCount]);
+        return (strategyOutput?.positions?.length || 0) > visibleTradesCount;
+    }, [strategyOutput?.positions?.length, visibleTradesCount]);
 
     const loadMoreTrades = useCallback(() => {
         setVisibleTradesCount(prev => prev + 50);
@@ -587,7 +588,7 @@ export function VisualizationTab() {
                     <CardTitle className="text-lg">Backtest Results</CardTitle>
                     <CardDescription>
                         {strategyApplied && strategyOutput
-                            ? `${strategyOutput.StrategyName} v${strategyOutput.StrategyVersion} - ${strategyOutput.Positions?.length || 0} trades executed`
+                            ? `${strategyOutput.strategyName} v${strategyOutput.strategyVersion} - ${strategyOutput.positions?.length || 0} trades executed`
                             : "No backtest results - apply a strategy to see results"}
                     </CardDescription>
                 </CardHeader>
@@ -634,18 +635,18 @@ export function VisualizationTab() {
                                     <p
                                         className={`text-2xl font-bold ${
                                             strategyOutput
-                                                .TotalPnL >= 0
+                                                .totalPnL >= 0
                                                 ? "text-green-500"
                                                 : "text-red-500"
                                         }`}
                                     >
                                         $
-                                        {strategyOutput.TotalPnL.toFixed(
+                                        {strategyOutput.totalPnL.toFixed(
                                             2
                                         )}
                                         <span className="text-sm ml-2">
-                                            ({strategyOutput.TotalPnLPercent >= 0 ? '+' : ''}
-                                            {strategyOutput.TotalPnLPercent.toFixed(2)}%)
+                                            ({strategyOutput.totalPnLPercent >= 0 ? '+' : ''}
+                                            {strategyOutput.totalPnLPercent.toFixed(2)}%)
                                         </span>
                                     </p>
                                 </div>
@@ -654,7 +655,7 @@ export function VisualizationTab() {
                                         Win Rate
                                     </p>
                                     <p className="text-2xl font-bold">
-                                        {strategyOutput.WinRate.toFixed(
+                                        {strategyOutput.winRate.toFixed(
                                             1
                                         )}
                                         %
@@ -667,13 +668,13 @@ export function VisualizationTab() {
                                     <p
                                         className={`text-2xl font-bold ${
                                             strategyOutput
-                                                .ProfitFactor >=
+                                                .profitFactor >=
                                             1
                                                 ? "text-green-500"
                                                 : "text-red-500"
                                         }`}
                                     >
-                                        {strategyOutput.ProfitFactor.toFixed(
+                                        {strategyOutput.profitFactor.toFixed(
                                             2
                                         )}
                                     </p>
@@ -685,7 +686,7 @@ export function VisualizationTab() {
                                     <p className="text-2xl font-bold">
                                         {
                                             strategyOutput
-                                                .TotalTrades
+                                                .totalTrades
                                         }
                                     </p>
                                 </div>
@@ -702,7 +703,7 @@ export function VisualizationTab() {
                                     <span className="font-medium text-green-500">
                                         {
                                             strategyOutput
-                                                .WinningTrades
+                                                .winningTrades
                                         }
                                     </span>
                                 </div>
@@ -713,7 +714,7 @@ export function VisualizationTab() {
                                     <span className="font-medium text-red-500">
                                         {
                                             strategyOutput
-                                                .LosingTrades
+                                                .losingTrades
                                         }
                                     </span>
                                 </div>
@@ -723,7 +724,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-green-500">
                                         $
-                                        {strategyOutput.AverageWin.toFixed(
+                                        {strategyOutput.averageWin.toFixed(
                                             2
                                         )}
                                     </span>
@@ -736,7 +737,7 @@ export function VisualizationTab() {
                                         $
                                         {Math.abs(
                                             strategyOutput
-                                                .AverageLoss
+                                                .averageLoss
                                         ).toFixed(2)}
                                     </span>
                                 </div>
@@ -746,7 +747,7 @@ export function VisualizationTab() {
                                     </span>
                                     <span className="font-medium text-red-500">
                                         $
-                                        {strategyOutput.MaxDrawdown.toFixed(
+                                        {strategyOutput.maxDrawdown.toFixed(
                                             2
                                         )}
                                     </span>
@@ -756,7 +757,7 @@ export function VisualizationTab() {
                                         Sharpe Ratio
                                     </span>
                                     <span className="font-medium">
-                                        {strategyOutput.SharpeRatio.toFixed(
+                                        {strategyOutput.sharpeRatio.toFixed(
                                             2
                                         )}
                                     </span>
@@ -768,7 +769,7 @@ export function VisualizationTab() {
                                     <span className="font-medium text-green-500">
                                         {
                                             strategyOutput
-                                                .LongestWinStreak
+                                                .longestWinStreak
                                         }
                                     </span>
                                 </div>
@@ -779,7 +780,7 @@ export function VisualizationTab() {
                                     <span className="font-medium text-red-500">
                                         {
                                             strategyOutput
-                                                .LongestLossStreak
+                                                .longestLossStreak
                                         }
                                     </span>
                                 </div>
@@ -788,12 +789,12 @@ export function VisualizationTab() {
                             <Separator />
 
                             {/* Trades Table - with pagination for performance */}
-                            {strategyOutput.Positions && strategyOutput.Positions.length > 0 ? (
+                            {strategyOutput.positions && strategyOutput.positions.length > 0 ? (
                                 <div>
                                     <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-semibold">Trade History</h3>
                                         <span className="text-sm text-muted-foreground">
-                                            Showing {visibleTrades.length} of {strategyOutput.Positions.length} trades
+                                            Showing {visibleTrades.length} of {strategyOutput.positions.length} trades
                                         </span>
                                     </div>
                                     <div className="max-h-80 overflow-y-auto">
@@ -813,7 +814,7 @@ export function VisualizationTab() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {visibleTrades.map((position: main.Position, index: number) => (
+                                                {visibleTrades.map((position: exchange.Position, index: number) => (
                                                     <TradeRow
                                                         key={index}
                                                         position={position}

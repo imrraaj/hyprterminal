@@ -1,5 +1,5 @@
-import { FetchCandles, StrategyBacktest, StrategyRun, StopLiveStrategy, GetRunningStrategies } from '@/../wailsjs/go/main/App';
-import { main } from '@/../wailsjs/go/models';
+import { FetchCandles, StrategyBacktest, StrategyRun, StopLiveStrategy, GetRunningStrategies } from '@/../wailsjs/go/app/App';
+import { engine } from '@/../wailsjs/go/models';
 import { useChartStore } from '@/store/chartStore';
 
 export class TradingStrategyManager {
@@ -60,33 +60,39 @@ export class TradingStrategyManager {
         }
     }
 
-    private sliceStrategyOutput(output: main.BacktestOutput | null, start: number, end: number): main.BacktestOutput | null {
+    private sliceStrategyOutput(output: engine.BacktestResult | null, start: number, end: number): engine.BacktestResult | null {
         if (!output) return null;
 
-        return new main.BacktestOutput({
-            TrendLines: output.TrendLines?.slice(start, end) || [],
-            TrendColors: output.TrendColors?.slice(start, end) || [],
-            Directions: output.Directions?.slice(start, end) || [],
-            Labels: output.Labels || [],
-            Signals: output.Signals || [],
-            Positions: output.Positions || [],
-            StrategyName: output.StrategyName,
-            StrategyVersion: output.StrategyVersion,
-            TotalPnL: output.TotalPnL,
-            TotalPnLPercent: output.TotalPnLPercent,
-            WinRate: output.WinRate,
-            TotalTrades: output.TotalTrades,
-            WinningTrades: output.WinningTrades,
-            LosingTrades: output.LosingTrades,
-            AverageWin: output.AverageWin,
-            AverageLoss: output.AverageLoss,
-            ProfitFactor: output.ProfitFactor,
-            MaxDrawdown: output.MaxDrawdown,
-            MaxDrawdownPercent: output.MaxDrawdownPercent,
-            SharpeRatio: output.SharpeRatio,
-            LongestWinStreak: output.LongestWinStreak,
-            LongestLossStreak: output.LongestLossStreak,
-            AverageHoldTime: output.AverageHoldTime,
+        // Slice the visualization data if it exists
+        const slicedVisualization = output.visualization ? {
+            trendLines: output.visualization.trendLines?.slice(start, end) || [],
+            trendColors: output.visualization.trendColors?.slice(start, end) || [],
+            directions: output.visualization.directions?.slice(start, end) || [],
+            labels: output.visualization.labels || [],
+            lines: output.visualization.lines || [],
+        } : undefined;
+
+        return new engine.BacktestResult({
+            strategyName: output.strategyName,
+            strategyVersion: output.strategyVersion,
+            positions: output.positions || [],
+            signals: output.signals || [],
+            visualization: slicedVisualization,
+            totalPnL: output.totalPnL,
+            totalPnLPercent: output.totalPnLPercent,
+            winRate: output.winRate,
+            totalTrades: output.totalTrades,
+            winningTrades: output.winningTrades,
+            losingTrades: output.losingTrades,
+            averageWin: output.averageWin,
+            averageLoss: output.averageLoss,
+            profitFactor: output.profitFactor,
+            maxDrawdown: output.maxDrawdown,
+            maxDrawdownPercent: output.maxDrawdownPercent,
+            sharpeRatio: output.sharpeRatio,
+            longestWinStreak: output.longestWinStreak,
+            longestLossStreak: output.longestLossStreak,
+            averageHoldTime: output.averageHoldTime,
         });
     }
 
@@ -96,7 +102,7 @@ export class TradingStrategyManager {
         limit: number,
         strategyId: string,
         params: Record<string, any>
-    ): Promise<main.BacktestOutput> {
+    ): Promise<engine.BacktestResult> {
         const key = `apply-${symbol}-${interval}-${strategyId}`;
         this.cancelPendingRequest(key);
 
@@ -105,11 +111,23 @@ export class TradingStrategyManager {
         try {
             setLoading(true);
 
+            // Extract config fields from params
+            const { takeProfitPercent, stopLossPercent, tradeDirection, ...strategyParams } = params;
+
+            const config = {
+                PositionSize: 1.0, // Default position size
+                TradeDirection: tradeDirection || 'both',
+                TakeProfitPercent: takeProfitPercent || 0,
+                StopLossPercent: stopLossPercent || 0,
+            };
+
             const fullStrategyOutput = await StrategyBacktest(
+                strategyId,
                 symbol,
                 interval,
                 limit,
-                params
+                strategyParams,
+                config
             );
 
             const { loadedRange } = chartData;
@@ -152,12 +170,23 @@ export class TradingStrategyManager {
     }
 
     async startLiveStrategy(
-        name: string,
+        id: string,
+        strategyId: string,
         symbol: string,
         interval: string,
         params: Record<string, any>
     ): Promise<void> {
-        return StrategyRun(name, symbol, interval, params);
+        // Extract config fields from params
+        const { takeProfitPercent, stopLossPercent, tradeDirection, ...strategyParams } = params;
+
+        const config = {
+            PositionSize: 1.0, // Default position size
+            TradeDirection: tradeDirection || 'both',
+            TakeProfitPercent: takeProfitPercent || 0,
+            StopLossPercent: stopLossPercent || 0,
+        };
+
+        return StrategyRun(id, strategyId, symbol, interval, strategyParams, config);
     }
 
     async stopLiveStrategy(id: string): Promise<void> {

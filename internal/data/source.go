@@ -1,4 +1,4 @@
-package main
+package data
 
 import (
 	"context"
@@ -11,11 +11,13 @@ import (
 	hyperliquid "github.com/sonirico/go-hyperliquid"
 )
 
-func parseFloat(s string) float64 {
+// ParseFloat converts a string to float64
+func ParseFloat(s string) float64 {
 	f, _ := strconv.ParseFloat(s, 64)
 	return f
 }
 
+// Source handles fetching candle data from Hyperliquid with Redis caching
 type Source struct {
 	info         *hyperliquid.Info
 	ctx          context.Context
@@ -23,7 +25,8 @@ type Source struct {
 	cacheEnabled bool
 }
 
-func NewSource(config Config) *Source {
+// NewSource creates a new data source
+func NewSource() *Source {
 	info := hyperliquid.NewInfo(context.Background(), hyperliquid.MainnetAPIURL, true, nil, nil)
 	return &Source{
 		info: info,
@@ -31,10 +34,12 @@ func NewSource(config Config) *Source {
 	}
 }
 
+// SetContext sets the context for the source
 func (s *Source) SetContext(ctx context.Context) {
 	s.ctx = ctx
 }
 
+// SetRedis configures Redis client for caching
 func (s *Source) SetRedis(client *redis.Client) {
 	s.redisClient = client
 	if client != nil {
@@ -102,6 +107,7 @@ func (s *Source) setToCache(symbol, interval string, limit int, candles []hyperl
 	s.redisClient.Set(ctx, key, data, ttl)
 }
 
+// FetchHistoricalCandles fetches candles with caching
 func (s *Source) FetchHistoricalCandles(symbol string, interval string, limit int) ([]hyperliquid.Candle, error) {
 	if candles, found := s.getFromCache(symbol, interval, limit); found {
 		return candles, nil
@@ -117,6 +123,7 @@ func (s *Source) FetchHistoricalCandles(symbol string, interval string, limit in
 	return candles, nil
 }
 
+// FetchCandlesBefore fetches candles before a specific timestamp
 func (s *Source) FetchCandlesBefore(symbol string, interval string, limit int, beforeTimestamp int64) ([]hyperliquid.Candle, error) {
 	const maxCandlesPerRequest = 5000
 	if limit <= maxCandlesPerRequest {
@@ -169,7 +176,6 @@ func (s *Source) fetchSingleBatch(symbol string, interval string, limit int, bef
 	intervalDuration := s.intervalDuration(interval)
 	startTime := endTime.Add(-time.Duration(limit) * intervalDuration)
 
-	// Use proper context with timeout instead of context.TODO()
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 
@@ -207,6 +213,27 @@ func (s *Source) intervalDuration(interval string) time.Duration {
 	}
 }
 
+// IntervalDuration converts interval string to duration (exported for engine use)
+func IntervalDuration(interval string) time.Duration {
+	switch interval {
+	case "1m":
+		return time.Minute
+	case "5m":
+		return 5 * time.Minute
+	case "15m":
+		return 15 * time.Minute
+	case "1h":
+		return time.Hour
+	case "4h":
+		return 4 * time.Hour
+	case "1d":
+		return 24 * time.Hour
+	default:
+		return 5 * time.Minute
+	}
+}
+
+// InvalidateCache clears all cached candles
 func (s *Source) InvalidateCache() error {
 	if !s.cacheEnabled {
 		return nil
@@ -214,7 +241,6 @@ func (s *Source) InvalidateCache() error {
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
 
-	// Collect keys first
 	var keys []string
 	iter := s.redisClient.Scan(ctx, 0, "candles:*", 100).Iterator()
 	for iter.Next(ctx) {
@@ -224,7 +250,6 @@ func (s *Source) InvalidateCache() error {
 		return err
 	}
 
-	// Batch delete using pipeline
 	if len(keys) > 0 {
 		pipe := s.redisClient.Pipeline()
 		for _, key := range keys {
@@ -236,6 +261,7 @@ func (s *Source) InvalidateCache() error {
 	return nil
 }
 
+// InvalidateCacheForSymbol clears cached candles for a specific symbol
 func (s *Source) InvalidateCacheForSymbol(symbol string) error {
 	if !s.cacheEnabled {
 		return nil
@@ -244,7 +270,6 @@ func (s *Source) InvalidateCacheForSymbol(symbol string) error {
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
 
-	// Collect keys first
 	var keys []string
 	iter := s.redisClient.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
@@ -254,7 +279,6 @@ func (s *Source) InvalidateCacheForSymbol(symbol string) error {
 		return err
 	}
 
-	// Batch delete using pipeline
 	if len(keys) > 0 {
 		pipe := s.redisClient.Pipeline()
 		for _, key := range keys {

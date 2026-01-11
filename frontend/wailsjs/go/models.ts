@@ -1,3 +1,279 @@
+export namespace engine {
+	
+	export class BacktestResult {
+	    strategyName: string;
+	    strategyVersion: string;
+	    positions: exchange.Position[];
+	    signals: exchange.Signal[];
+	    visualization?: strategy.Visualization;
+	    TrendLines: number[];
+	    TrendColors: string[];
+	    Directions: number[];
+	    Labels: strategy.Label[];
+	    Lines: strategy.Line[];
+	    totalPnL: number;
+	    totalPnLPercent: number;
+	    winRate: number;
+	    totalTrades: number;
+	    winningTrades: number;
+	    losingTrades: number;
+	    averageWin: number;
+	    averageLoss: number;
+	    profitFactor: number;
+	    maxDrawdown: number;
+	    maxDrawdownPercent: number;
+	    sharpeRatio: number;
+	    longestWinStreak: number;
+	    longestLossStreak: number;
+	    averageHoldTime: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BacktestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.strategyName = source["strategyName"];
+	        this.strategyVersion = source["strategyVersion"];
+	        this.positions = this.convertValues(source["positions"], exchange.Position);
+	        this.signals = this.convertValues(source["signals"], exchange.Signal);
+	        this.visualization = this.convertValues(source["visualization"], strategy.Visualization);
+	        this.TrendLines = source["TrendLines"];
+	        this.TrendColors = source["TrendColors"];
+	        this.Directions = source["Directions"];
+	        this.Labels = this.convertValues(source["Labels"], strategy.Label);
+	        this.Lines = this.convertValues(source["Lines"], strategy.Line);
+	        this.totalPnL = source["totalPnL"];
+	        this.totalPnLPercent = source["totalPnLPercent"];
+	        this.winRate = source["winRate"];
+	        this.totalTrades = source["totalTrades"];
+	        this.winningTrades = source["winningTrades"];
+	        this.losingTrades = source["losingTrades"];
+	        this.averageWin = source["averageWin"];
+	        this.averageLoss = source["averageLoss"];
+	        this.profitFactor = source["profitFactor"];
+	        this.maxDrawdown = source["maxDrawdown"];
+	        this.maxDrawdownPercent = source["maxDrawdownPercent"];
+	        this.sharpeRatio = source["sharpeRatio"];
+	        this.longestWinStreak = source["longestWinStreak"];
+	        this.longestLossStreak = source["longestLossStreak"];
+	        this.averageHoldTime = source["averageHoldTime"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RunningStrategyInfo {
+	    id: string;
+	    strategyId: string;
+	    strategyName: string;
+	    symbol: string;
+	    interval: string;
+	    isRunning: boolean;
+	    config: position.ExecutionConfig;
+	    hasPosition: boolean;
+	    positionSide?: string;
+	    positionSize?: number;
+	    entryPrice?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunningStrategyInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.strategyId = source["strategyId"];
+	        this.strategyName = source["strategyName"];
+	        this.symbol = source["symbol"];
+	        this.interval = source["interval"];
+	        this.isRunning = source["isRunning"];
+	        this.config = this.convertValues(source["config"], position.ExecutionConfig);
+	        this.hasPosition = source["hasPosition"];
+	        this.positionSide = source["positionSide"];
+	        this.positionSize = source["positionSize"];
+	        this.entryPrice = source["entryPrice"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace exchange {
+	
+	export class ActivePosition {
+	    coin: string;
+	    side: string;
+	    entryPrice: number;
+	    positionValue: number;
+	    unrealizedPnL: number;
+	    returnOnEquity: number;
+	    leverage: number;
+	    liquidationPx: number;
+	    marginUsed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ActivePosition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.coin = source["coin"];
+	        this.side = source["side"];
+	        this.entryPrice = source["entryPrice"];
+	        this.positionValue = source["positionValue"];
+	        this.unrealizedPnL = source["unrealizedPnL"];
+	        this.returnOnEquity = source["returnOnEquity"];
+	        this.leverage = source["leverage"];
+	        this.liquidationPx = source["liquidationPx"];
+	        this.marginUsed = source["marginUsed"];
+	    }
+	}
+	export class BalanceInfo {
+	    accountValue: string;
+	    totalMarginUsed: string;
+	    totalNtlPos: string;
+	    totalRawUsd: string;
+	    withdrawAvail: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BalanceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountValue = source["accountValue"];
+	        this.totalMarginUsed = source["totalMarginUsed"];
+	        this.totalNtlPos = source["totalNtlPos"];
+	        this.totalRawUsd = source["totalRawUsd"];
+	        this.withdrawAvail = source["withdrawAvail"];
+	    }
+	}
+	export class PortfolioSummary {
+	    balance: BalanceInfo;
+	    positions: ActivePosition[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PortfolioSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.balance = this.convertValues(source["balance"], BalanceInfo);
+	        this.positions = this.convertValues(source["positions"], ActivePosition);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Position {
+	    entryIndex: number;
+	    entryPrice: number;
+	    entryTime: number;
+	    exitIndex: number;
+	    exitPrice: number;
+	    exitTime: number;
+	    side: string;
+	    size: number;
+	    pnl: number;
+	    pnlPercentage: number;
+	    isOpen: boolean;
+	    exitReason: string;
+	    maxDrawdown: number;
+	    maxProfit: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Position(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryIndex = source["entryIndex"];
+	        this.entryPrice = source["entryPrice"];
+	        this.entryTime = source["entryTime"];
+	        this.exitIndex = source["exitIndex"];
+	        this.exitPrice = source["exitPrice"];
+	        this.exitTime = source["exitTime"];
+	        this.side = source["side"];
+	        this.size = source["size"];
+	        this.pnl = source["pnl"];
+	        this.pnlPercentage = source["pnlPercentage"];
+	        this.isOpen = source["isOpen"];
+	        this.exitReason = source["exitReason"];
+	        this.maxDrawdown = source["maxDrawdown"];
+	        this.maxProfit = source["maxProfit"];
+	    }
+	}
+	export class Signal {
+	    index: number;
+	    type: number;
+	    price: number;
+	    time: number;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Signal(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.type = source["type"];
+	        this.price = source["price"];
+	        this.time = source["time"];
+	        this.reason = source["reason"];
+	    }
+	}
+
+}
+
 export namespace hyperliquid {
 	
 	export class Candle {
@@ -30,248 +306,19 @@ export namespace hyperliquid {
 	        this.v = source["v"];
 	    }
 	}
-	export class OpenOrder {
-	    coin: string;
-	    limitPx: number;
-	    oid: number;
-	    side: string;
-	    sz: number;
-	    timestamp: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new OpenOrder(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.coin = source["coin"];
-	        this.limitPx = source["limitPx"];
-	        this.oid = source["oid"];
-	        this.side = source["side"];
-	        this.sz = source["sz"];
-	        this.timestamp = source["timestamp"];
-	    }
-	}
 
 }
 
-export namespace main {
+export namespace position {
 	
-	export class AccountBalance {
-	    AccountValue: string;
-	    TotalRawUsd: string;
-	    Withdrawable: string;
-	    TotalMargin: string;
-	    AccountLeverage: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new AccountBalance(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.AccountValue = source["AccountValue"];
-	        this.TotalRawUsd = source["TotalRawUsd"];
-	        this.Withdrawable = source["Withdrawable"];
-	        this.TotalMargin = source["TotalMargin"];
-	        this.AccountLeverage = source["AccountLeverage"];
-	    }
-	}
-	export class ActivePosition {
-	    Coin: string;
-	    Side: string;
-	    Size: string;
-	    EntryPrice: string;
-	    CurrentPrice: string;
-	    LiquidationPx: string;
-	    UnrealizedPnl: string;
-	    PositionValue: string;
-	    Leverage: number;
-	    MarginUsed: string;
-	    ReturnOnEquity: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ActivePosition(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Coin = source["Coin"];
-	        this.Side = source["Side"];
-	        this.Size = source["Size"];
-	        this.EntryPrice = source["EntryPrice"];
-	        this.CurrentPrice = source["CurrentPrice"];
-	        this.LiquidationPx = source["LiquidationPx"];
-	        this.UnrealizedPnl = source["UnrealizedPnl"];
-	        this.PositionValue = source["PositionValue"];
-	        this.Leverage = source["Leverage"];
-	        this.MarginUsed = source["MarginUsed"];
-	        this.ReturnOnEquity = source["ReturnOnEquity"];
-	    }
-	}
-	export class Position {
-	    EntryIndex: number;
-	    EntryPrice: number;
-	    EntryTime: number;
-	    ExitIndex: number;
-	    ExitPrice: number;
-	    ExitTime: number;
-	    Side: string;
-	    Size: number;
-	    PnL: number;
-	    PnLPercentage: number;
-	    IsOpen: boolean;
-	    ExitReason: string;
-	    MaxDrawdown: number;
-	    MaxProfit: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new Position(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.EntryIndex = source["EntryIndex"];
-	        this.EntryPrice = source["EntryPrice"];
-	        this.EntryTime = source["EntryTime"];
-	        this.ExitIndex = source["ExitIndex"];
-	        this.ExitPrice = source["ExitPrice"];
-	        this.ExitTime = source["ExitTime"];
-	        this.Side = source["Side"];
-	        this.Size = source["Size"];
-	        this.PnL = source["PnL"];
-	        this.PnLPercentage = source["PnLPercentage"];
-	        this.IsOpen = source["IsOpen"];
-	        this.ExitReason = source["ExitReason"];
-	        this.MaxDrawdown = source["MaxDrawdown"];
-	        this.MaxProfit = source["MaxProfit"];
-	    }
-	}
-	export class Signal {
-	    Index: number;
-	    Type: number;
-	    Price: number;
-	    Time: number;
-	    Reason: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Signal(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Index = source["Index"];
-	        this.Type = source["Type"];
-	        this.Price = source["Price"];
-	        this.Time = source["Time"];
-	        this.Reason = source["Reason"];
-	    }
-	}
-	export class Label {
-	    Index: number;
-	    Price: number;
-	    Text: string;
-	    Direction: number;
-	    Percentage: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new Label(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Index = source["Index"];
-	        this.Price = source["Price"];
-	        this.Text = source["Text"];
-	        this.Direction = source["Direction"];
-	        this.Percentage = source["Percentage"];
-	    }
-	}
-	export class BacktestOutput {
-	    TrendLines: number[];
-	    TrendColors: string[];
-	    Directions: number[];
-	    Labels: Label[];
-	    Signals: Signal[];
-	    Positions: Position[];
-	    StrategyName: string;
-	    StrategyVersion: string;
-	    TotalPnL: number;
-	    TotalPnLPercent: number;
-	    WinRate: number;
-	    TotalTrades: number;
-	    WinningTrades: number;
-	    LosingTrades: number;
-	    AverageWin: number;
-	    AverageLoss: number;
-	    ProfitFactor: number;
-	    MaxDrawdown: number;
-	    MaxDrawdownPercent: number;
-	    SharpeRatio: number;
-	    LongestWinStreak: number;
-	    LongestLossStreak: number;
-	    AverageHoldTime: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new BacktestOutput(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.TrendLines = source["TrendLines"];
-	        this.TrendColors = source["TrendColors"];
-	        this.Directions = source["Directions"];
-	        this.Labels = this.convertValues(source["Labels"], Label);
-	        this.Signals = this.convertValues(source["Signals"], Signal);
-	        this.Positions = this.convertValues(source["Positions"], Position);
-	        this.StrategyName = source["StrategyName"];
-	        this.StrategyVersion = source["StrategyVersion"];
-	        this.TotalPnL = source["TotalPnL"];
-	        this.TotalPnLPercent = source["TotalPnLPercent"];
-	        this.WinRate = source["WinRate"];
-	        this.TotalTrades = source["TotalTrades"];
-	        this.WinningTrades = source["WinningTrades"];
-	        this.LosingTrades = source["LosingTrades"];
-	        this.AverageWin = source["AverageWin"];
-	        this.AverageLoss = source["AverageLoss"];
-	        this.ProfitFactor = source["ProfitFactor"];
-	        this.MaxDrawdown = source["MaxDrawdown"];
-	        this.MaxDrawdownPercent = source["MaxDrawdownPercent"];
-	        this.SharpeRatio = source["SharpeRatio"];
-	        this.LongestWinStreak = source["LongestWinStreak"];
-	        this.LongestLossStreak = source["LongestLossStreak"];
-	        this.AverageHoldTime = source["AverageHoldTime"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class StrategyConfig {
+	export class ExecutionConfig {
 	    PositionSize: number;
 	    TradeDirection: string;
 	    TakeProfitPercent: number;
 	    StopLossPercent: number;
-	    Interval: number;
-	    Parameters: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
-	        return new StrategyConfig(source);
+	        return new ExecutionConfig(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -280,34 +327,93 @@ export namespace main {
 	        this.TradeDirection = source["TradeDirection"];
 	        this.TakeProfitPercent = source["TakeProfitPercent"];
 	        this.StopLossPercent = source["StopLossPercent"];
-	        this.Interval = source["Interval"];
-	        this.Parameters = source["Parameters"];
 	    }
 	}
-	export class MaxTrendPointsStrategy {
-	    ID: string;
-	    Symbol: string;
-	    Interval: string;
-	    LastCandleTime: number;
-	    IsRunning: boolean;
-	    Position?: Position;
-	    Factor: number;
-	    Config: StrategyConfig;
+
+}
+
+export namespace strategy {
+	
+	export class Label {
+	    index: number;
+	    price: number;
+	    text: string;
+	    direction: number;
+	    percentage: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new MaxTrendPointsStrategy(source);
+	        return new Label(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ID = source["ID"];
-	        this.Symbol = source["Symbol"];
-	        this.Interval = source["Interval"];
-	        this.LastCandleTime = source["LastCandleTime"];
-	        this.IsRunning = source["IsRunning"];
-	        this.Position = this.convertValues(source["Position"], Position);
-	        this.Factor = source["Factor"];
-	        this.Config = this.convertValues(source["Config"], StrategyConfig);
+	        this.index = source["index"];
+	        this.price = source["price"];
+	        this.text = source["text"];
+	        this.direction = source["direction"];
+	        this.percentage = source["percentage"];
+	    }
+	}
+	export class Line {
+	    startIndex: number;
+	    startPrice: number;
+	    endIndex: number;
+	    endPrice: number;
+	    direction: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Line(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.startIndex = source["startIndex"];
+	        this.startPrice = source["startPrice"];
+	        this.endIndex = source["endIndex"];
+	        this.endPrice = source["endPrice"];
+	        this.direction = source["direction"];
+	    }
+	}
+	export class Option {
+	    value: any;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Option(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.label = source["label"];
+	    }
+	}
+	export class ParameterDef {
+	    name: string;
+	    label: string;
+	    type: string;
+	    defaultValue: any;
+	    min?: number;
+	    max?: number;
+	    step?: number;
+	    options?: Option[];
+	    required: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParameterDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.label = source["label"];
+	        this.type = source["type"];
+	        this.defaultValue = source["defaultValue"];
+	        this.min = source["min"];
+	        this.max = source["max"];
+	        this.step = source["step"];
+	        this.options = this.convertValues(source["options"], Option);
+	        this.required = source["required"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -328,24 +434,24 @@ export namespace main {
 		    return a;
 		}
 	}
-	export class PortfolioSummary {
-	    Balance: AccountBalance;
-	    Positions: ActivePosition[];
-	    TotalPositions: number;
-	    TotalPnL: number;
-	    OpenOrders: hyperliquid.OpenOrder[];
+	export class Metadata {
+	    id: string;
+	    name: string;
+	    version: string;
+	    description: string;
+	    parameters: ParameterDef[];
 	
 	    static createFrom(source: any = {}) {
-	        return new PortfolioSummary(source);
+	        return new Metadata(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Balance = this.convertValues(source["Balance"], AccountBalance);
-	        this.Positions = this.convertValues(source["Positions"], ActivePosition);
-	        this.TotalPositions = source["TotalPositions"];
-	        this.TotalPnL = source["TotalPnL"];
-	        this.OpenOrders = this.convertValues(source["OpenOrders"], hyperliquid.OpenOrder);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.description = source["description"];
+	        this.parameters = this.convertValues(source["parameters"], ParameterDef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -368,6 +474,44 @@ export namespace main {
 	}
 	
 	
+	export class Visualization {
+	    trendLines: number[];
+	    trendColors: string[];
+	    directions: number[];
+	    labels: Label[];
+	    lines: Line[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Visualization(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.trendLines = source["trendLines"];
+	        this.trendColors = source["trendColors"];
+	        this.directions = source["directions"];
+	        this.labels = this.convertValues(source["labels"], Label);
+	        this.lines = this.convertValues(source["lines"], Line);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 

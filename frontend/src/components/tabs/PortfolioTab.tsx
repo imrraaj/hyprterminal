@@ -48,11 +48,11 @@ export function PortfolioTab() {
         return null;
     }
 
-    const accountValue = parseFloat(portfolio.Balance.AccountValue);
-    const totalMargin = parseFloat(portfolio.Balance.TotalMargin);
+    const accountValue = parseFloat(portfolio.balance.accountValue);
+    const totalMargin = parseFloat(portfolio.balance.totalMarginUsed);
     const marginAvailable = accountValue - totalMargin;
-    const unrealizedPnL = portfolio.Positions.reduce(
-        (sum, pos) => sum + parseFloat(pos.UnrealizedPnl),
+    const unrealizedPnL = portfolio.positions.reduce(
+        (sum: number, pos: any) => sum + pos.unrealizedPnL,
         0
     );
 
@@ -96,7 +96,7 @@ export function PortfolioTab() {
                     <CardHeader className="pb-3">
                         <CardDescription>Withdrawable</CardDescription>
                         <CardTitle className="text-3xl">
-                            ${parseFloat(portfolio.Balance.Withdrawable).toFixed(2)}
+                            ${parseFloat(portfolio.balance.withdrawAvail).toFixed(2)}
                         </CardTitle>
                     </CardHeader>
                 </Card>
@@ -135,7 +135,7 @@ export function PortfolioTab() {
                                     Total Raw USD
                                 </span>
                                 <span className="font-semibold">
-                                    ${parseFloat(portfolio.Balance.TotalRawUsd).toFixed(2)}
+                                    ${parseFloat(portfolio.balance.totalRawUsd).toFixed(2)}
                                 </span>
                             </div>
                             <Separator />
@@ -144,7 +144,7 @@ export function PortfolioTab() {
                                     Open Positions
                                 </span>
                                 <span className="font-semibold">
-                                    {portfolio.TotalPositions}
+                                    {portfolio.positions.length}
                                 </span>
                             </div>
                         </div>
@@ -160,10 +160,10 @@ export function PortfolioTab() {
                             <Separator />
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-muted-foreground">
-                                    Account Leverage
+                                    Total Notional Position
                                 </span>
                                 <span className="font-semibold">
-                                    {portfolio.Balance.AccountLeverage.toFixed(1)}x
+                                    ${parseFloat(portfolio.balance.totalNtlPos).toFixed(2)}
                                 </span>
                             </div>
                         </div>
@@ -178,7 +178,7 @@ export function PortfolioTab() {
                     <CardDescription>Current active positions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {portfolio.Positions.length === 0 ? (
+                    {portfolio.positions.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                             No open positions
                         </div>
@@ -197,24 +197,24 @@ export function PortfolioTab() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {portfolio.Positions.map((position, idx) => {
-                                    const pnl = parseFloat(position.UnrealizedPnl);
+                                {portfolio.positions.map((position: any, idx: number) => {
+                                    const pnl = position.unrealizedPnL;
                                     return (
                                         <TableRow key={idx}>
                                             <TableCell className="font-medium">
-                                                {position.Coin}/USD
+                                                {position.coin}/USD
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
                                                     variant={
-                                                        position.Side === "long" ? "default" : "destructive"
+                                                        position.side === "long" ? "default" : "destructive"
                                                     }
                                                 >
-                                                    {position.Side.toUpperCase()}
+                                                    {position.side.toUpperCase()}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                ${parseFloat(position.EntryPrice).toFixed(2)}
+                                                ${parseFloat(position.entryPrice).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 ${parseFloat(position.CurrentPrice).toFixed(2)}
@@ -223,7 +223,7 @@ export function PortfolioTab() {
                                                 {position.Size}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                ${parseFloat(position.PositionValue).toFixed(2)}
+                                                ${parseFloat(position.positionValue).toFixed(2)}
                                             </TableCell>
                                             <TableCell
                                                 className={`text-right font-semibold ${pnl >= 0 ? "text-green-500" : "text-red-500"
@@ -232,12 +232,12 @@ export function PortfolioTab() {
                                                 ${pnl.toFixed(2)}
                                             </TableCell>
                                             <TableCell
-                                                className={`text-right ${parseFloat(position.ReturnOnEquity) >= 0
+                                                className={`text-right ${parseFloat(position.returnOnEquity) >= 0
                                                         ? "text-green-500"
                                                         : "text-red-500"
                                                     }`}
                                             >
-                                                {position.ReturnOnEquity}%
+                                                {position.returnOnEquity}%
                                             </TableCell>
                                         </TableRow>
                                     );
