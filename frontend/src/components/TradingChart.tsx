@@ -75,7 +75,7 @@ export const TradingChart = ({ intervalSeconds }: TradingChartProps) => {
     const lastTrendLine =
       strategyOutput.TrendLines[strategyOutput.TrendLines.length - 1] || 0;
     const sumDirections = strategyOutput.Directions.reduce(
-      (sum, d) => sum + d,
+      (sum: number, d: number) => sum + d,
       0
     );
     return `${strategyOutput.Directions.length}-${

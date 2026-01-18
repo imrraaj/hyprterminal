@@ -7,13 +7,15 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
+
+	"terminal/internal/app"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	application := app.New()
 
 	err := wails.Run(&options.App{
 		Title:  "HyperTerminal",
@@ -22,10 +24,10 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
+		OnStartup:  application.Startup,
+		OnShutdown: application.Shutdown,
 		Bind: []any{
-			app,
+			application,
 		},
 		Linux: &linux.Options{
 			WebviewGpuPolicy: linux.WebviewGpuPolicyAlways,

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { SYMBOLS, TIMEFRAMES } from "@/config/trading";
 
 interface SidebarProps {
     symbol: string;
@@ -9,17 +10,6 @@ interface SidebarProps {
     onSymbolChange: (symbol: string) => void;
     onTimeframeChange: (timeframe: string) => void;
 }
-
-const TIMEFRAMES = [
-    { value: '1m', label: '1 Minute' },
-    { value: '5m', label: '5 Minutes' },
-    { value: '15m', label: '15 Minutes' },
-    { value: '1h', label: '1 Hour' },
-    { value: '4h', label: '4 Hours' },
-    { value: '1d', label: '1 Day' },
-];
-
-const SYMBOLS = ['BTC', 'ETH', 'SOL', 'ARB', 'OP'];
 
 export function Sidebar({ symbol, timeframe, onSymbolChange, onTimeframeChange }: SidebarProps) {
     const [strategyParams, setStrategyParams] = useState({
@@ -46,7 +36,7 @@ export function Sidebar({ symbol, timeframe, onSymbolChange, onTimeframeChange }
                         </SelectTrigger>
                         <SelectContent>
                             {SYMBOLS.map(sym => (
-                                <SelectItem key={sym} value={sym}>{sym}</SelectItem>
+                                <SelectItem key={sym.value} value={sym.value}>{sym.label}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

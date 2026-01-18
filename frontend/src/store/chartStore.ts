@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { hyperliquid, main } from '../../wailsjs/go/models';
+import { hyperliquid, engine } from '../../wailsjs/go/models';
 
 export interface ChartData {
     candles: hyperliquid.Candle[];
     allCandles: hyperliquid.Candle[];
-    strategyOutput: main.BacktestOutput | null;
-    fullStrategyOutput: main.BacktestOutput | null;
+    strategyOutput: engine.BacktestResult | null;
+    fullStrategyOutput: engine.BacktestResult | null;
     symbol: string;
     interval: string;
     isLoading: boolean;
@@ -16,7 +16,7 @@ export interface ChartData {
 interface ChartStore {
     chartData: ChartData;
     setChartData: (data: Partial<ChartData>) => void;
-    updateStrategyOutput: (output: main.BacktestOutput) => void;
+    updateStrategyOutput: (output: engine.BacktestResult) => void;
     setLoading: (loading: boolean) => void;
     appendCandles: (candles: hyperliquid.Candle[], direction: 'left' | 'right') => void;
     setAllCandles: (candles: hyperliquid.Candle[]) => void;

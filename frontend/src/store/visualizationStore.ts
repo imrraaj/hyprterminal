@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Strategy, STRATEGIES } from '@/types/strategy';
-import { main } from '../../wailsjs/go/models';
+import { engine } from '../../wailsjs/go/models';
 
 interface VisualizationState {
     symbol: string;
@@ -11,7 +11,7 @@ interface VisualizationState {
     stopLossPercent: number;
     tradeDirection: 'both' | 'long' | 'short';
     strategyApplied: boolean;
-    cachedStrategyOutput: main.BacktestOutput | null;
+    cachedStrategyOutput: engine.BacktestResult | null;
     cacheKey: string;
     showEntryPrices: boolean;
 
@@ -23,7 +23,7 @@ interface VisualizationState {
     setStopLossPercent: (percent: number) => void;
     setTradeDirection: (direction: 'both' | 'long' | 'short') => void;
     setStrategyApplied: (applied: boolean) => void;
-    setCachedStrategyOutput: (output: main.BacktestOutput | null, key: string) => void;
+    setCachedStrategyOutput: (output: engine.BacktestResult | null, key: string) => void;
     clearCache: () => void;
     setShowEntryPrices: (show: boolean) => void;
 }

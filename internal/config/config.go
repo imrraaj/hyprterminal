@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"crypto/ecdsa"
@@ -9,6 +9,7 @@ import (
 	"github.com/sonirico/go-hyperliquid"
 )
 
+// Config holds application configuration
 type Config struct {
 	URL        string
 	PrivateKey *ecdsa.PrivateKey
@@ -16,7 +17,8 @@ type Config struct {
 	RedisURL   string
 }
 
-func NewConfig() Config {
+// New creates a new Config by reading the private key from .secret file
+func New() Config {
 	pk, err := os.ReadFile(".secret")
 	if err != nil {
 		panic(fmt.Errorf("failed to read .secret file: %w", err))
@@ -38,6 +40,7 @@ func NewConfig() Config {
 	}
 }
 
+// SetSourceURL sets the API URL
 func (c *Config) SetSourceURL(url string) {
 	c.URL = url
 }

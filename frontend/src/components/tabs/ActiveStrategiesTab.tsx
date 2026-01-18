@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, TrendingUp, TrendingDown } from "lucide-react";
+import { X } from "lucide-react";
 import { TradingStrategyManager } from "@/lib/TradingStrategyManager";
 
 interface ActiveStrategy {
@@ -30,65 +29,6 @@ interface Position {
     pnlPercentage: number;
     liquidationPrice: number;
 }
-
-const mockStrategies: ActiveStrategy[] = [
-    {
-        id: '1',
-        name: 'Max Trend Points',
-        symbol: 'BTC',
-        timeframe: '1h',
-        params: { factor: 2.5 },
-        status: 'running',
-        positions: [
-            {
-                id: 'p1',
-                side: 'long',
-                entryPrice: 43250.00,
-                currentPrice: 43580.00,
-                size: 0.5,
-                leverage: 5,
-                margin: 4325.00,
-                unrealizedPnL: 165.00,
-                pnlPercentage: 3.81,
-                liquidationPrice: 34600.00
-            }
-        ],
-        realizedPnL: 1245.50
-    },
-    {
-        id: '2',
-        name: 'Max Trend Points',
-        symbol: 'ETH',
-        timeframe: '4h',
-        params: { factor: 3.0 },
-        status: 'running',
-        positions: [
-            {
-                id: 'p2',
-                side: 'short',
-                entryPrice: 2580.00,
-                currentPrice: 2545.00,
-                size: 2.0,
-                leverage: 3,
-                margin: 1720.00,
-                unrealizedPnL: 70.00,
-                pnlPercentage: 4.07,
-                liquidationPrice: 3096.00
-            }
-        ],
-        realizedPnL: 850.25
-    },
-    {
-        id: '3',
-        name: 'Max Trend Points',
-        symbol: 'SOL',
-        timeframe: '1h',
-        params: { factor: 2.0 },
-        status: 'paused',
-        positions: [],
-        realizedPnL: -125.00
-    }
-];
 
 const strategyManager = TradingStrategyManager.getInstance();
 
