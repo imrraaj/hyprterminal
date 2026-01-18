@@ -63,11 +63,16 @@ export class TradingStrategyManager {
     private sliceStrategyOutput(output: engine.BacktestResult | null, start: number, end: number): engine.BacktestResult | null {
         if (!output) return null;
 
-        // Slice the visualization data if it exists
+        // Slice the visualization data - use flattened fields (PascalCase) from BacktestResult
+        const slicedTrendLines = output.TrendLines?.slice(start, end) || [];
+        const slicedTrendColors = output.TrendColors?.slice(start, end) || [];
+        const slicedDirections = output.Directions?.slice(start, end) || [];
+
+        // Also create sliced nested visualization if it exists
         const slicedVisualization = output.visualization ? {
-            trendLines: output.visualization.trendLines?.slice(start, end) || [],
-            trendColors: output.visualization.trendColors?.slice(start, end) || [],
-            directions: output.visualization.directions?.slice(start, end) || [],
+            trendLines: slicedTrendLines,
+            trendColors: slicedTrendColors,
+            directions: slicedDirections,
             labels: output.visualization.labels || [],
             lines: output.visualization.lines || [],
         } : undefined;
@@ -78,6 +83,12 @@ export class TradingStrategyManager {
             positions: output.positions || [],
             signals: output.signals || [],
             visualization: slicedVisualization,
+            // Include flattened visualization fields for chart rendering
+            TrendLines: slicedTrendLines,
+            TrendColors: slicedTrendColors,
+            Directions: slicedDirections,
+            Labels: output.Labels || [],
+            Lines: output.Lines || [],
             totalPnL: output.totalPnL,
             totalPnLPercent: output.totalPnLPercent,
             winRate: output.winRate,

@@ -153,12 +153,16 @@ export function VisualizationTab() {
 
     // Restore cached strategy output when tab mounts
     useEffect(() => {
-        strategyManager.loadData(symbol, timeframe, LIMIT, INITIAL_VIEWPORT);
+        const loadAndRestore = async () => {
+            await strategyManager.loadData(symbol, timeframe, LIMIT, INITIAL_VIEWPORT);
 
-        // Restore cached output if available and matches current config
-        if (cachedStrategyOutput && cacheKey === generateCacheKey()) {
-            updateStrategyOutput(cachedStrategyOutput);
-        }
+            // Restore cached output if available and matches current config
+            const currentCacheKey = generateCacheKey();
+            if (cachedStrategyOutput && cacheKey === currentCacheKey) {
+                updateStrategyOutput(cachedStrategyOutput);
+            }
+        };
+        loadAndRestore();
     }, [symbol, timeframe]);
 
     const currentTimeframe = useMemo(
